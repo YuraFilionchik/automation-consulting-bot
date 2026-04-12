@@ -4,7 +4,8 @@
       "Bash(mkdir *)",
       "Bash(sshpass *)",
       "Bash(ssh-keygen *)",
-      "Bash(type *)"
+      "Bash(type *)",
+      "Bash(git add *)"
     ]
   },
   "$version": 3
