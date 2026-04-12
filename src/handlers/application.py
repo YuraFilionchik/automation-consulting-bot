@@ -1,4 +1,4 @@
-"""Хендлер для приема заявок"""
+"""Handler for applications"""
 
 import logging
 
@@ -24,7 +24,7 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-# Состояния для заявки
+# Application states
 class ApplicationState(StatesGroup):
     project_type = State()
     project_subtype = State()

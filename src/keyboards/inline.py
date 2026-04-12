@@ -20,19 +20,19 @@ def get_start_keyboard():
 
 
 def get_project_type_keyboard():
-    """Выбор типа проекта"""
+    """Select project type"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🤖 Бот", callback_data="type_bot"),
+                InlineKeyboardButton(text="🤖 Bot", callback_data="type_bot"),
                 InlineKeyboardButton(text="📊 CRM", callback_data="type_crm"),
             ],
             [
-                InlineKeyboardButton(text="🌐 Сайт", callback_data="type_website"),
-                InlineKeyboardButton(text="🔍 Парсинг", callback_data="type_parsing"),
+                InlineKeyboardButton(text="🌐 Website", callback_data="type_website"),
+                InlineKeyboardButton(text="🔍 Parsing", callback_data="type_parsing"),
             ],
             [
-                InlineKeyboardButton(text="📦 Другое", callback_data="type_other"),
+                InlineKeyboardButton(text="📦 Other", callback_data="type_other"),
             ],
         ]
     )
@@ -40,19 +40,19 @@ def get_project_type_keyboard():
 
 
 def get_bot_subtype_keyboard():
-    """Подтип для бота"""
+    """Bot subtype selection"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="📢 Рассылка", callback_data="subtype_broadcast"),
-                InlineKeyboardButton(text="📝 Сбор заявок", callback_data="subtype_lead_form"),
+                InlineKeyboardButton(text="📢 Broadcast Bot", callback_data="subtype_broadcast"),
+                InlineKeyboardButton(text="📝 Lead Form", callback_data="subtype_lead_form"),
             ],
             [
-                InlineKeyboardButton(text="🔗 Интеграция", callback_data="subtype_integration"),
-                InlineKeyboardButton(text="💬 Чат-бот", callback_data="subtype_chatbot"),
+                InlineKeyboardButton(text="🔗 Integration", callback_data="subtype_integration"),
+                InlineKeyboardButton(text="💬 Chat Bot", callback_data="subtype_chatbot"),
             ],
             [
-                InlineKeyboardButton(text="📦 Другое", callback_data="subtype_other"),
+                InlineKeyboardButton(text="📦 Other", callback_data="subtype_other"),
             ],
         ]
     )

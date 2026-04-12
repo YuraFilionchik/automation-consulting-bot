@@ -1,4 +1,4 @@
-"""Хендлер для AI консультаций"""
+"""Handler for AI consultations"""
 
 import logging
 
@@ -14,13 +14,13 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-# Состояния для консультации
+# Consultation states
 class ConsultationState(StatesGroup):
     active = State()
 
 
-# Хранение истории диалога в памяти (для простоты)
-# В продакшене лучше использовать Redis или БД
+# Store conversation history in memory (for simplicity)
+# In production, use Redis or database
 user_conversations = {}
 
 
@@ -52,17 +52,17 @@ async def start_consultation(callback: CallbackQuery, state: FSMContext):
 
 @router.message(ConsultationState.active)
 async def handle_consultation_message(message: Message, state: FSMContext):
-    """Обработка сообщения в режиме консультации"""
+    """Handle message in consultation mode"""
     
     user_id = message.from_user.id
     user_message = message.text.strip()
     
-    # Проверить хочет ли пользователь оставить заявку
-    if any(keyword in user_message.lower() for keyword in ['хочу заявку', 'оставить заявку', 'оформить заявку']):
+    # Check if user wants to submit an application
+    if any(keyword in user_message.lower() for keyword in ['want application', 'submit application', 'apply now']):
         from src.handlers.application import start_application
-        await message.answer("💡 Понял! Переключаю на оформление заявки...")
+        await message.answer("💡 Got it! Switching to application form...")
         await state.clear()
-        # Создать фейковый callback для вызова функции
+        # Create fake callback to call the function
         class FakeCallback:
             def __init__(self, user):
                 self.message = message
@@ -70,26 +70,26 @@ async def handle_consultation_message(message: Message, state: FSMContext):
         await start_application(FakeCallback(message.from_user), state)
         return
     
-    # Добавить сообщение пользователя в историю
+    # Add user message to history
     if user_id not in user_conversations:
         user_conversations[user_id] = []
     
     user_conversations[user_id].append({"role": "user", "content": user_message})
     
-    # Показать индикатор набора текста
-    await message.answer("⏳ Думаю...")
+    # Show typing indicator
+    await message.answer("⏳ Thinking...")
     
-    # Получить ответ от AI
+    # Get AI response
     ai_response = await ai_service.get_response(
         user_message=user_message,
         conversation_history=user_conversations[user_id]
     )
     
-    # Добавить ответ AI в историю
+    # Add AI response to history
     user_conversations[user_id].append({"role": "assistant", "content": ai_response})
     
-    # Отправить ответ
-    await message.delete()  # Удалить "Думаю..."
+    # Send response
+    await message.delete()  # Remove "Thinking..."
     await message.answer(ai_response, parse_mode="HTML")
     
     logger.info(f"Consultation message from user {user_id}: {len(user_message)} chars")
@@ -97,14 +97,14 @@ async def handle_consultation_message(message: Message, state: FSMContext):
 
 @router.message(F.text == "/consultation_status")
 async def consultation_status(message: Message, state: FSMContext):
-    """Показать статус консультации"""
+    """Show consultation status"""
     
     current_state = await state.get_state()
     
     if current_state == ConsultationState.active.state:
-        await message.answer("💬 Вы находитесь в режиме консультации с AI. Напишите ваш вопрос!")
+        await message.answer("💬 You are in AI consultation mode. Write your question!")
     else:
         await message.answer(
-            "Вы не в режиме консультации. Выберите '💬 Консультация с AI' в главном меню.",
+            "You are not in consultation mode. Select '💬 AI Consultation' from the main menu.",
             reply_markup=get_start_keyboard()
         )
