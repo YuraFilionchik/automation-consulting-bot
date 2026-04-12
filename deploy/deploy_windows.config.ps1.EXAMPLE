@@ -1,0 +1,10 @@
+# Deploy configuration - DO NOT COMMIT TO GIT
+# Copy this file to deploy_windows.config.ps1 and fill in your credentials
+
+$Server = "your-server.example.com"
+$Port = 22
+$User = "root"
+$Password = "your-password"
+$RemoteDir = "/opt/automation-bot"
+
+$ProjectDir = "d:\path\to\your\project"

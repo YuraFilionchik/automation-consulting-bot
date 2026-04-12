@@ -1,0 +1,20 @@
+[Unit]
+Description=Automation Consulting Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/home/botuser/automation-bot
+ExecStart=/home/botuser/automation-bot/venv/bin/python -m src.main
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/botuser/automation-bot/logs/bot.log
+StandardError=append:/home/botuser/automation-bot/logs/bot-error.log
+
+# Перезапуск каждую ночь (освобождение памяти)
+RuntimeMaxSec=86400
+
+[Install]
+WantedBy=multi-user.target
