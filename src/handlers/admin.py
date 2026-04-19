@@ -274,6 +274,20 @@ def install_dependencies() -> tuple[bool, str]:
 async def execute_full_update(message: Message):
     """Выполнить полное обновление с blue-green deployment"""
 
+    # Предварительная проверка: уже актуальная версия?
+    await message.answer("🔍 Checking for updates...")
+    success, local_commit, _ = run_command("git rev-parse HEAD")
+    success2, remote_commit, err = run_command(f"git ls-remote {REPO_URL} refs/heads/main")
+    if success and success2 and local_commit and remote_commit:
+        remote_sha = remote_commit.split()[0] if remote_commit else ""
+        if remote_sha and local_commit.strip() == remote_sha.strip():
+            await message.answer(
+                "✅ <b>Already up to date!</b>\n\n"
+                f"Current version: <code>{local_commit.strip()[:8]}</code>\n"
+                "No update needed."
+            )
+            return
+
     # Этап 1: Клонировать в staging
     await message.answer("🔄 <b>Step 1/7:</b> Downloading update to staging area...")
     await asyncio.sleep(0.5)
