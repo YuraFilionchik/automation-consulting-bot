@@ -275,7 +275,7 @@ async def execute_full_update(message: Message):
     """Выполнить полное обновление с blue-green deployment"""
 
     # Предварительная проверка: уже актуальная версия?
-    await message.answer("🔍 Checking for updates...")
+    await message.answer("🔍 Checking for updates...", parse_mode="HTML")
     success, local_commit, _ = run_command("git rev-parse HEAD")
     success2, remote_commit, err = run_command(f"git ls-remote {REPO_URL} refs/heads/main")
     if success and success2 and local_commit and remote_commit:
@@ -285,21 +285,21 @@ async def execute_full_update(message: Message):
                 "✅ <b>Already up to date!</b>\n\n"
                 f"Current version: <code>{local_commit.strip()[:8]}</code>\n"
                 "No update needed."
-            )
+            , parse_mode="HTML")
             return
 
     # Этап 1: Клонировать в staging
-    await message.answer("🔄 <b>Step 1/7:</b> Downloading update to staging area...")
+    await message.answer("🔄 <b>Step 1/7:</b> Downloading update to staging area...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     success, msg = clone_to_staging()
     if not success:
-        await message.answer(f"❌ <b>Download failed!</b>\n\n<code>{msg}</code>")
+        await message.answer(f"❌ <b>Download failed!</b>\n\n<code>{msg}</code>", parse_mode="HTML")
         return
-    await message.answer(f"✅ Downloaded: {msg}")
+    await message.answer(f"✅ Downloaded: {msg}", parse_mode="HTML")
 
     # Этап 2: Проверить staging
-    await message.answer("🔄 <b>Step 2/7:</b> Validating update package...")
+    await message.answer("🔄 <b>Step 2/7:</b> Validating update package...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     success, msg = check_staging()
@@ -308,24 +308,24 @@ async def execute_full_update(message: Message):
             f"❌ <b>Validation failed!</b>\n\n"
             f"<code>{msg}</code>\n\n"
             f"🧹 Staging cleaned up. Current version untouched."
-        )
+        , parse_mode="HTML")
         cleanup_staging()
         return
-    await message.answer(f"✅ Validation: {msg}")
+    await message.answer(f"✅ Validation: {msg}", parse_mode="HTML")
 
     # Этап 3: Бэкап текущей версии
-    await message.answer("🔄 <b>Step 3/7:</b> Creating backup of current version...")
+    await message.answer("🔄 <b>Step 3/7:</b> Creating backup of current version...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     success, msg = backup_current_version()
     if not success:
-        await message.answer(f"❌ <b>Backup failed!</b>\n\n<code>{msg}</code>")
+        await message.answer(f"❌ <b>Backup failed!</b>\n\n<code>{msg}</code>", parse_mode="HTML")
         cleanup_staging()
         return
-    await message.answer(f"✅ Backup: {msg}")
+    await message.answer(f"✅ Backup: {msg}", parse_mode="HTML")
 
     # Этап 4: Активировать staging
-    await message.answer("🔄 <b>Step 4/7:</b> Activating new version...")
+    await message.answer("🔄 <b>Step 4/7:</b> Activating new version...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     success, msg = activate_staging()
@@ -334,12 +334,12 @@ async def execute_full_update(message: Message):
             f"❌ <b>Activation failed!</b>\n\n"
             f"<code>{msg}</code>\n\n"
             f"🔄 Already rolled back to previous version."
-        )
+        , parse_mode="HTML")
         return
-    await message.answer(f"✅ Activated: {msg}")
+    await message.answer(f"✅ Activated: {msg}", parse_mode="HTML")
 
     # Этап 5: Установить зависимости
-    await message.answer("🔄 <b>Step 5/7:</b> Installing Python dependencies...")
+    await message.answer("🔄 <b>Step 5/7:</b> Installing Python dependencies...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     success, msg = install_dependencies()
@@ -348,12 +348,12 @@ async def execute_full_update(message: Message):
             f"⚠️ <b>Dependency installation issue:</b>\n"
             f"<code>{msg}</code>\n\n"
             f"Continuing..."
-        )
+        , parse_mode="HTML")
     else:
-        await message.answer(f"✅ Dependencies: {msg}")
+        await message.answer(f"✅ Dependencies: {msg}", parse_mode="HTML")
 
     # Этап 6: Проверить .env
-    await message.answer("🔄 <b>Step 6/7:</b> Checking configuration...")
+    await message.answer("🔄 <b>Step 6/7:</b> Checking configuration...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     env_path = os.path.join(PROJECT_DIR, ".env")
@@ -368,17 +368,17 @@ async def execute_full_update(message: Message):
             await message.answer(
                 f"⚠️ <b>Missing keys in .env:</b>\n"
                 f"<code>{', '.join(missing)}</code>"
-            )
+            , parse_mode="HTML")
         else:
-            await message.answer("✅ Configuration OK.")
+            await message.answer("✅ Configuration OK.", parse_mode="HTML")
     else:
         await message.answer(
             f"⚠️ <b>.env file not found!</b>\n"
             f"Create it at: <code>{env_path}</code>"
-        )
+        , parse_mode="HTML")
 
     # Этап 7: Перезапустить сервис
-    await message.answer("🔄 <b>Step 7/7:</b> Restarting bot service...")
+    await message.answer("🔄 <b>Step 7/7:</b> Restarting bot service...", parse_mode="HTML")
     await asyncio.sleep(0.5)
 
     # Определить имя сервиса
@@ -409,7 +409,7 @@ async def execute_full_update(message: Message):
             f"• /rollback — Revert to backup\n"
             f"• /update_status — Check update status\n\n"
             f"Bot will restart in ~3 seconds. 🤖"
-        )
+        , parse_mode="HTML")
         logger.info(f"Update completed by admin {message.from_user.id}. Restarting {service_name}...")
 
         # Запустить перезапуск с задержкой через nohup, чтобы текущий процесс успел завершить отправку
@@ -434,7 +434,7 @@ async def execute_full_update(message: Message):
             f"• /rollback — Revert to backup\n"
             f"• /update_status — Check update status\n\n"
             f"Check the bot in Telegram to confirm it's working! 🤖"
-        )
+        , parse_mode="HTML")
         logger.info(f"Update completed by admin {message.from_user.id} (no systemd service found)")
 
 
@@ -445,7 +445,7 @@ async def handle_update(message: Message):
     """Полное обновление из GitHub"""
 
     if message.from_user.id not in settings.admin_ids_list:
-        await message.answer("🚫 <b>Access denied!</b>\n\nOnly administrators can use this command.")
+        await message.answer("🚫 <b>Access denied!</b>\n\nOnly administrators can use this command.", parse_mode="HTML")
         return
 
     await message.answer(
@@ -455,7 +455,7 @@ async def handle_update(message: Message):
         f"💾 Backups: <code>{BACKUPS_DIR}</code>\n"
         f"👤 Admin: {message.from_user.full_name}\n\n"
         f"This may take 1-3 minutes. Current version will be backed up."
-    )
+    , parse_mode="HTML")
 
     try:
         await execute_full_update(message)
@@ -465,7 +465,7 @@ async def handle_update(message: Message):
             f"❌ <b>Update failed with error!</b>\n\n"
             f"<code>{str(e)[:1000]}</code>\n\n"
             f"🔄 Previous version should be intact. Check logs."
-        )
+        , parse_mode="HTML")
         logger.error(f"Update failed: {e}", exc_info=True)
 
 
@@ -474,18 +474,18 @@ async def handle_rollback(message: Message):
     """Откат к последнему бэкапу"""
 
     if message.from_user.id not in settings.admin_ids_list:
-        await message.answer("🚫 <b>Access denied!</b>")
+        await message.answer("🚫 <b>Access denied!</b>", parse_mode="HTML")
         return
 
-    await message.answer("🔄 <b>Starting rollback...</b>")
+    await message.answer("🔄 <b>Starting rollback...</b>", parse_mode="HTML")
 
     success, msg = rollback_to_backup()
 
     if success:
-        await message.answer(f"✅ <b>Rollback successful!</b>\n\n<code>{msg}</code>\n\nNow restart the bot service.")
+        await message.answer(f"✅ <b>Rollback successful!</b>\n\n<code>{msg}</code>\n\nNow restart the bot service.", parse_mode="HTML")
         logger.info(f"Rollback performed by admin {message.from_user.id}")
     else:
-        await message.answer(f"❌ <b>Rollback failed!</b>\n\n<code>{msg}</code>")
+        await message.answer(f"❌ <b>Rollback failed!</b>\n\n<code>{msg}</code>", parse_mode="HTML")
 
 
 @router.message(F.text == "/update_status")
@@ -493,7 +493,7 @@ async def handle_status(message: Message):
     """Статус обновлений и бэкапов"""
 
     if message.from_user.id not in settings.admin_ids_list:
-        await message.answer("🚫 <b>Access denied!</b>")
+        await message.answer("🚫 <b>Access denied!</b>", parse_mode="HTML")
         return
 
     # Бэкапы

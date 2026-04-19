@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from src.keyboards.inline import get_start_keyboard, get_main_menu_inline, get_cancel_keyboard
 from src.services.ai_service import ai_service
+from src.utils.formatters import sanitize_html
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ async def handle_consultation_message(message: Message, state: FSMContext):
     
     # Send response
     await message.delete()  # Remove "Thinking..."
-    await message.answer(ai_response, parse_mode="HTML")
+    await message.answer(sanitize_html(ai_response), parse_mode="HTML")
     
     logger.info(f"Consultation message from user {user_id}: {len(user_message)} chars")
 
