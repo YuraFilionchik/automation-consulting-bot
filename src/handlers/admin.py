@@ -23,6 +23,8 @@ PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__
 STAGING_DIR = os.path.join(PROJECT_DIR, ".staging_update")
 # Директория для бэкапов
 BACKUPS_DIR = os.path.join(PROJECT_DIR, "backups")
+# Файл с SHA реально задеплоенной версии
+DEPLOYED_COMMIT_FILE = os.path.join(PROJECT_DIR, "DEPLOYED_COMMIT")
 # Файлы/папки которые НЕ копируем из staging
 EXCLUDE_NAMES = {
     ".env",          # Конфиг — не трогаем
@@ -74,6 +76,42 @@ def clone_to_staging() -> tuple[bool, str]:
         return False, f"Clone failed: {err or out}"
 
     return True, "Repository cloned to staging."
+
+
+def get_repo_commit(cwd: str) -> str | None:
+    """Получить SHA коммита git-репозитория в указанной директории."""
+    success, out, _ = run_command("git rev-parse HEAD", cwd=cwd)
+    if success and out:
+        return out.strip()
+    return None
+
+
+def get_remote_commit() -> str | None:
+    """Получить SHA последнего коммита в main на GitHub."""
+    success, out, _ = run_command(f"git ls-remote {REPO_URL} refs/heads/main")
+    if success and out:
+        return out.split()[0].strip()
+    return None
+
+
+def get_deployed_commit() -> str | None:
+    """Получить SHA реально задеплоенной версии приложения."""
+    if os.path.exists(DEPLOYED_COMMIT_FILE):
+        try:
+            with open(DEPLOYED_COMMIT_FILE, "r", encoding="utf-8") as f:
+                deployed_commit = f.read().strip()
+            if deployed_commit:
+                return deployed_commit
+        except OSError:
+            pass
+
+    return get_repo_commit(PROJECT_DIR)
+
+
+def write_deployed_commit(commit_sha: str):
+    """Сохранить SHA реально задеплоенной версии."""
+    with open(DEPLOYED_COMMIT_FILE, "w", encoding="utf-8") as f:
+        f.write(f"{commit_sha}\n")
 
 
 def check_staging() -> tuple[bool, str]:
@@ -144,6 +182,10 @@ def activate_staging() -> tuple[bool, str]:
     temp_old = os.path.join(PROJECT_DIR, ".old_version_temp")
 
     try:
+        staging_commit = get_repo_commit(STAGING_DIR)
+        if not staging_commit:
+            return False, "Failed to determine staging commit SHA."
+
         # 1. Переместить текущие файлы (кроме исключений) во временную папку
         if os.path.exists(temp_old):
             shutil.rmtree(temp_old)
@@ -171,6 +213,8 @@ def activate_staging() -> tuple[bool, str]:
                 shutil.copytree(src, dst)
             else:
                 shutil.copy2(src, dst)
+
+            write_deployed_commit(staging_commit)
 
         # 3. Удалить временную папку (бэкап уже есть)
         shutil.rmtree(temp_old, ignore_errors=True)
@@ -276,11 +320,10 @@ async def execute_full_update(message: Message):
 
     # Предварительная проверка: уже актуальная версия?
     await message.answer("🔍 Checking for updates...", parse_mode="HTML")
-    success, local_commit, _ = run_command("git rev-parse HEAD")
-    success2, remote_commit, err = run_command(f"git ls-remote {REPO_URL} refs/heads/main")
-    if success and success2 and local_commit and remote_commit:
-        remote_sha = remote_commit.split()[0] if remote_commit else ""
-        if remote_sha and local_commit.strip() == remote_sha.strip():
+    local_commit = get_deployed_commit()
+    remote_sha = get_remote_commit()
+    if local_commit and remote_sha:
+        if local_commit.strip() == remote_sha.strip():
             await message.answer(
                 "✅ <b>Already up to date!</b>\n\n"
                 f"Current version: <code>{local_commit.strip()[:8]}</code>\n"
