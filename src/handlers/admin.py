@@ -367,53 +367,61 @@ async def execute_full_update(message: Message):
     await message.answer("🔄 <b>Step 7/7:</b> Restarting bot service...")
     await asyncio.sleep(0.5)
 
-    # Проверить systemd
-    success, out, err = run_command("systemctl is-active automation-bot.service")
-    if success and out.strip() == "active":
-        run_command("systemctl restart automation-bot.service")
-        await asyncio.sleep(2)
-        success2, status, _ = run_command("systemctl is-active automation-bot.service")
-        if success2 and status.strip() == "active":
-            await message.answer("✅ Service restarted successfully.")
-        else:
-            await message.answer(
-                f"⚠️ Service status: <code>{status}</code>\n"
-                f"Check: <code>journalctl -u automation-bot.service -n 20</code>"
-            )
+    # Определить имя сервиса
+    service_name = None
+    for svc in ("automation-bot.service", "bot.service"):
+        ok, out, _ = run_command(f"systemctl is-active {svc}")
+        if ok and out.strip() == "active":
+            service_name = svc
+            break
+
+    if service_name:
+        # Отправить все сообщения ДО перезапуска, чтобы они успели дойти
+        # (systemctl restart убьёт текущий процесс немедленно)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        await message.answer(
+            f"✅ <b>Update Complete!</b>\n\n"
+            f"🕐 Time: {timestamp}\n"
+            f"📂 Project: <code>{PROJECT_DIR}</code>\n"
+            f"📦 Repo: <code>{REPO_URL}</code>\n\n"
+            f"📊 <b>Summary:</b>\n"
+            f"• Code: Downloaded → Validated → Activated\n"
+            f"• Backup: Created\n"
+            f"• Dependencies: Updated\n"
+            f"• Config: Checked\n"
+            f"• Service: Restarting now...\n\n"
+            f"💡 <b>Commands:</b>\n"
+            f"• /update_app — Update again\n"
+            f"• /rollback — Revert to backup\n"
+            f"• /update_status — Check update status\n\n"
+            f"Bot will restart in ~3 seconds. 🤖"
+        )
+        logger.info(f"Update completed by admin {message.from_user.id}. Restarting {service_name}...")
+
+        # Запустить перезапуск с задержкой через nohup, чтобы текущий процесс успел завершить отправку
+        run_command(f"nohup bash -c 'sleep 3 && systemctl restart {service_name}' &>/dev/null &")
+        return
     else:
-        # Проверить bot.service
-        success, out, err = run_command("systemctl is-active bot.service")
-        if success and out.strip() == "active":
-            run_command("systemctl restart bot.service")
-            await asyncio.sleep(2)
-            await message.answer("✅ Service restarted (bot.service).")
-        else:
-            await message.answer(
-                "ℹ️ No systemd service found.\n"
-                "Please restart the bot manually."
-            )
-
-    # Финальный отчёт
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    await message.answer(
-        f"✅ <b>Update Complete!</b>\n\n"
-        f"🕐 Time: {timestamp}\n"
-        f"📂 Project: <code>{PROJECT_DIR}</code>\n"
-        f"📦 Repo: <code>{REPO_URL}</code>\n\n"
-        f"📊 <b>Summary:</b>\n"
-        f"• Code: Downloaded → Validated → Activated\n"
-        f"• Backup: Created\n"
-        f"• Dependencies: Updated\n"
-        f"• Config: Checked\n"
-        f"• Service: Restarted\n\n"
-        f"💡 <b>Commands:</b>\n"
-        f"• /update_app — Update again\n"
-        f"• /rollback — Revert to backup\n"
-        f"• /update_status — Check update status\n\n"
-        f"Check the bot in Telegram to confirm it's working! 🤖"
-    )
-
-    logger.info(f"Update completed by admin {message.from_user.id}")
+        # Сервис не найден — отправить финальный отчёт вручную
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        await message.answer(
+            f"✅ <b>Update Complete!</b>\n\n"
+            f"🕐 Time: {timestamp}\n"
+            f"📂 Project: <code>{PROJECT_DIR}</code>\n"
+            f"📦 Repo: <code>{REPO_URL}</code>\n\n"
+            f"📊 <b>Summary:</b>\n"
+            f"• Code: Downloaded → Validated → Activated\n"
+            f"• Backup: Created\n"
+            f"• Dependencies: Updated\n"
+            f"• Config: Checked\n"
+            f"• Service: Not managed by systemd — restart manually\n\n"
+            f"💡 <b>Commands:</b>\n"
+            f"• /update_app — Update again\n"
+            f"• /rollback — Revert to backup\n"
+            f"• /update_status — Check update status\n\n"
+            f"Check the bot in Telegram to confirm it's working! 🤖"
+        )
+        logger.info(f"Update completed by admin {message.from_user.id} (no systemd service found)")
 
 
 # ========== Команды ==========
