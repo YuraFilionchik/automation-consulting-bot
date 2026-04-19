@@ -2,7 +2,7 @@
 
 import logging
 
-from aiogram import Router, F
+from aiogram import Bot, Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -142,12 +142,12 @@ async def set_contact_info(message: Message, state: FSMContext):
         "Tell us more about your task.\n\n"
         "What exactly do you need done? Describe in your own words:"
     )
-    await message.answer(text, reply_markup=get_cancel_keyboard())
+    await message.answer(text, reply_markup=get_cancel_keyboard(), parse_mode="HTML")
     await message.delete()
 
 
 @router.message(ApplicationState.task_description)
-async def set_task_description(message: Message, state: FSMContext):
+async def set_task_description(message: Message, state: FSMContext, bot: Bot):
     """Set task description and save application"""
     
     task_desc = message.text.strip()

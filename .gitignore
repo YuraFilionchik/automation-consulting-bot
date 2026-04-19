@@ -56,3 +56,6 @@ backups/
 
 # Deploy configs (secrets)
 deploy/deploy_windows.config.ps1
+
+# Local agent credentials
+AGENT.md

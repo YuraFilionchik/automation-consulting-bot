@@ -6,6 +6,7 @@ from typing import Optional
 from src.models.application import Application, save_application
 from src.models.database import get_db_connection
 from src.config.settings import settings
+from src.utils.formatters import sanitize_html
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +36,18 @@ def get_application_summary(data: dict) -> str:
     """Get application summary for user"""
     
     summary = "📋 <b>Application Summary:</b>\n\n"
-    summary += f"Type: {data.get('project_type', 'Not specified')}\n"
+    summary += f"Type: {sanitize_html(data.get('project_type', 'Not specified'))}\n"
     
     if data.get('project_subtype'):
-        summary += f"Subtype: {data.get('project_subtype')}\n"
+        summary += f"Subtype: {sanitize_html(data.get('project_subtype'))}\n"
     
     summary += f"Budget: {data.get('budget_range', 'Not specified')}\n"
     summary += f"Timeline: {data.get('timeline', 'Not specified')}\n"
-    summary += f"Contact: {data.get('contact_info', 'Not specified')}\n"
-    summary += f"Task: {data.get('task_description', 'Not described')[:200]}"
+    summary += f"Contact: {sanitize_html(data.get('contact_info', 'Not specified'))}\n"
+    task_desc = data.get('task_description', 'Not described')
+    summary += f"Task: {sanitize_html(task_desc[:200])}"
     
-    if len(data.get('task_description', '')) > 200:
+    if len(task_desc) > 200:
         summary += "..."
     
     return summary

@@ -5,6 +5,7 @@ from typing import Optional
 from datetime import datetime
 
 from src.models.database import get_db_connection
+from src.utils.formatters import sanitize_html
 
 
 @dataclass
@@ -22,6 +23,7 @@ class Application:
     task_description: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    completed_at: Optional[str] = None
     
     def to_dict(self):
         """Преобразовать в словарь"""
@@ -30,14 +32,14 @@ class Application:
     def format_for_admin(self):
         """Format for admin notification"""
         text = f"📨 <b>New Application #{self.id}</b>\n\n"
-        text += f"📋 <b>Type:</b> {self.project_type}"
+        text += f"📋 <b>Type:</b> {sanitize_html(self.project_type or 'Not specified')}"
         if self.project_subtype:
-            text += f" ({self.project_subtype})"
+            text += f" ({sanitize_html(self.project_subtype)})"
         text += f"\n"
         text += f"💰 <b>Budget:</b> {self.budget_range or 'Not specified'}\n"
         text += f"⏰ <b>Timeline:</b> {self.timeline or 'Not specified'}\n"
-        text += f"📞 <b>Contact:</b> {self.contact_info or 'Not specified'}\n"
-        text += f"📝 <b>Task:</b> {self.task_description or 'Not described'}\n\n"
+        text += f"📞 <b>Contact:</b> {sanitize_html(self.contact_info or 'Not specified')}\n"
+        text += f"📝 <b>Task:</b> {sanitize_html(self.task_description or 'Not described')}\n\n"
         text += f"👤 <b>User:</b> {self.user_id}\n"
         text += f"🕐 <b>Time:</b> {self.created_at}"
         
@@ -47,13 +49,13 @@ class Application:
         """Format for user confirmation"""
         text = f"✅ <b>Application submitted!</b>\n\n"
         text += f"📋 <b>Summary:</b>\n"
-        text += f"Type: {self.project_type or 'Not specified'}\n"
+        text += f"Type: {sanitize_html(self.project_type or 'Not specified')}\n"
         if self.project_subtype:
-            text += f"Subtype: {self.project_subtype}\n"
+            text += f"Subtype: {sanitize_html(self.project_subtype)}\n"
         text += f"Budget: {self.budget_range or 'Not specified'}\n"
         text += f"Timeline: {self.timeline or 'Not specified'}\n"
-        text += f"Contact: {self.contact_info or 'Not specified'}\n"
-        text += f"Task: {self.task_description or 'Not described'}\n\n"
+        text += f"Contact: {sanitize_html(self.contact_info or 'Not specified')}\n"
+        text += f"Task: {sanitize_html(self.task_description or 'Not described')}\n\n"
         text += f"Our manager will contact you shortly! ⏳"
         
         return text

@@ -66,8 +66,8 @@
 - systemd достаточно для управления
 
 ### AI Провайдер
-- Основной: OpenAI API (GPT-3.5-turbo / GPT-4o-mini)
-- Альтернатива: Anthropic, Gemini через LiteLLM
+- Основной: Google - Gemini-3.1-flash-lite-preview
+- Альтернатива: Anthropic, OpenAI через LiteLLM
 - Кэширование ответов для экономии
 
 ## Метрики успеха
