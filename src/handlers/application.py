@@ -1,9 +1,10 @@
 """Handler for applications"""
 
 import logging
+from typing import Optional
 
 from aiogram import Bot, Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, User
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -38,12 +39,28 @@ class ApplicationState(StatesGroup):
 @router.callback_query(F.data == "action_application")
 async def start_application_callback(callback: CallbackQuery, state: FSMContext):
     """Start application flow from callback"""
-    await start_application(callback.message, state, callback)
+    await start_application(callback.message, state, callback=callback)
 
 
-async def start_application(message: Message, state: FSMContext, callback: CallbackQuery = None):
+async def start_application(message: Message, state: FSMContext, callback: CallbackQuery = None, initial_data: dict = None, user: User = None):
     """Start application flow (logic)"""
     
+    # Store user info in state if provided
+    if user:
+        await state.update_data(user_id=user.id, username=user.username)
+    elif message.from_user and not message.from_user.is_bot:
+        await state.update_data(user_id=message.from_user.id, username=message.from_user.username)
+
+    if initial_data:
+        # Pre-fill data from AI extraction
+        # Filter out None values
+        filtered_data = {k: v for k, v in initial_data.items() if v is not None}
+        await state.update_data(**filtered_data)
+
+        # Start the smart flow
+        await continue_application_flow(message, state)
+        return
+
     await state.set_state(ApplicationState.project_type)
     
     text = (
@@ -61,6 +78,82 @@ async def start_application(message: Message, state: FSMContext, callback: Callb
         user_id = message.from_user.id if message.from_user else "unknown"
 
     logger.info(f"User {user_id} started application")
+
+
+async def continue_application_flow(message: Message, state: FSMContext, bot: Bot = None):
+    """Smartly continue application flow by skipping already filled fields"""
+
+    data = await state.get_data()
+
+    # 1. Project Type
+    if not data.get('project_type'):
+        await state.set_state(ApplicationState.project_type)
+        await _send_or_edit(message, "What type of project are you interested in?\n\nChoose from the options or write your own:", get_project_type_keyboard())
+        return
+
+    # 2. Project Subtype (only if project_type is bot)
+    if data.get('project_type') == 'bot' and not data.get('project_subtype'):
+        await state.set_state(ApplicationState.project_subtype)
+        await _send_or_edit(message, "What functionality do you need from the bot?", get_bot_subtype_keyboard())
+        return
+
+    # 3. Budget
+    if not data.get('budget_range'):
+        await state.set_state(ApplicationState.budget_range)
+        await _send_or_edit(message, "What's your planned budget?", get_budget_keyboard())
+        return
+
+    # 4. Timeline
+    if not data.get('timeline'):
+        await state.set_state(ApplicationState.timeline)
+        await _send_or_edit(message, "When are you planning to start?", get_timeline_keyboard())
+        return
+
+    # 5. Contact Info
+    contact_info = data.get('contact_info')
+    if contact_info:
+        # Re-validate if it came from AI
+        is_valid, contact_type, result = validate_contact(contact_info)
+        if not is_valid:
+            contact_info = None # Trigger asking again
+        else:
+            await state.update_data(contact_info=result)
+
+    if not contact_info:
+        await state.set_state(ApplicationState.contact_info)
+        await _send_or_edit(message, "How can we reach you?\n\nPlease provide your phone or email:", get_cancel_keyboard())
+        return
+
+    # 6. Task Description
+    task_desc = data.get('task_description')
+    if task_desc:
+        is_valid, result = validate_task_description(task_desc)
+        if not is_valid:
+            task_desc = None
+        else:
+            await state.update_data(task_description=result)
+
+    if not task_desc:
+        await state.set_state(ApplicationState.task_description)
+        await _send_or_edit(message, "Tell us more about your task.\n\nWhat exactly do you need done? Describe in your own words (at least 10 characters):", get_cancel_keyboard())
+        return
+
+    # All data present!
+    if not bot:
+        bot = message.bot
+
+    await finalize_application(message, state, bot)
+
+
+async def _send_or_edit(message: Message, text: str, reply_markup=None):
+    """Helper to edit bot message or send a new one if it's a user message"""
+    if message.from_user and message.from_user.is_bot:
+        try:
+            await message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
+            return
+        except Exception:
+            pass
+    await message.answer(text, reply_markup=reply_markup, parse_mode="HTML")
 
 
 @router.callback_query(ApplicationState.project_type, F.data.startswith("type_"))
@@ -89,25 +182,10 @@ async def set_project_type_message(message: Message, state: FSMContext):
 async def process_project_type(project_type: str, message: Message, state: FSMContext, callback: CallbackQuery = None):
     """Common logic for project type processing"""
     await state.update_data(project_type=project_type)
+    if callback:
+        await callback.answer()
     
-    # If bot - ask subtype
-    if project_type == "bot":
-        await state.set_state(ApplicationState.project_subtype)
-        text = "What functionality do you need from the bot?"
-        if callback:
-            await callback.message.edit_text(text, reply_markup=get_bot_subtype_keyboard(), parse_mode="HTML")
-            await callback.answer()
-        else:
-            await message.answer(text, reply_markup=get_bot_subtype_keyboard(), parse_mode="HTML")
-    else:
-        # For other types - go straight to budget
-        await state.set_state(ApplicationState.budget_range)
-        text = f"Got it! {project_type.capitalize()} project. What's your planned budget?"
-        if callback:
-            await callback.message.edit_text(text, reply_markup=get_budget_keyboard(), parse_mode="HTML")
-            await callback.answer()
-        else:
-            await message.answer(text, reply_markup=get_budget_keyboard(), parse_mode="HTML")
+    await continue_application_flow(message, state)
 
 
 @router.callback_query(ApplicationState.project_subtype, F.data.startswith("subtype_"))
@@ -116,11 +194,8 @@ async def set_project_subtype(callback: CallbackQuery, state: FSMContext):
     
     subtype = callback.data.replace("subtype_", "")
     await state.update_data(project_subtype=subtype)
-    
-    await state.set_state(ApplicationState.budget_range)
-    text = "Got it! What's your planned budget?"
-    await callback.message.edit_text(text, reply_markup=get_budget_keyboard(), parse_mode="HTML")
     await callback.answer()
+    await continue_application_flow(callback.message, state)
 
 
 @router.message(ApplicationState.project_subtype)
@@ -147,11 +222,8 @@ async def set_budget(callback: CallbackQuery, state: FSMContext):
     }
     
     await state.update_data(budget_range=budget_map.get(budget, budget))
-    
-    await state.set_state(ApplicationState.timeline)
-    text = "When are you planning to start?"
-    await callback.message.edit_text(text, reply_markup=get_timeline_keyboard(), parse_mode="HTML")
     await callback.answer()
+    await continue_application_flow(callback.message, state)
 
 
 @router.message(ApplicationState.budget_range)
@@ -176,14 +248,8 @@ async def set_timeline(callback: CallbackQuery, state: FSMContext):
     }
     
     await state.update_data(timeline=timeline_map.get(timeline, timeline))
-    
-    await state.set_state(ApplicationState.contact_info)
-    text = (
-        "How can we reach you?\n\n"
-        "Please provide your phone or email:"
-    )
-    await callback.message.edit_text(text, reply_markup=get_cancel_keyboard(), parse_mode="HTML")
     await callback.answer()
+    await continue_application_flow(callback.message, state)
 
 
 @router.message(ApplicationState.timeline)
@@ -206,13 +272,7 @@ async def set_contact_info(message: Message, state: FSMContext):
         return
 
     await state.update_data(contact_info=result)
-    
-    await state.set_state(ApplicationState.task_description)
-    text = (
-        "Tell us more about your task.\n\n"
-        "What exactly do you need done? Describe in your own words (at least 10 characters):"
-    )
-    await message.answer(text, reply_markup=get_cancel_keyboard(), parse_mode="HTML")
+    await continue_application_flow(message, state)
 
 
 @router.message(ApplicationState.task_description)
@@ -226,17 +286,36 @@ async def set_task_description(message: Message, state: FSMContext, bot: Bot):
         return
 
     await state.update_data(task_description=result)
+    await finalize_application(message, state, bot)
+
+
+async def finalize_application(message: Message, state: FSMContext, bot: Bot):
+    """Finalize and save application"""
     
     # Get data
     data = await state.get_data()
-    data['user_id'] = message.from_user.id
+    user_id = data.get('user_id')
+    username = data.get('username', 'unknown')
     
+    # Fallback to current user if not in data
+    if not user_id and message.from_user and not message.from_user.is_bot:
+        user_id = message.from_user.id
+        username = message.from_user.username
+
+    if not user_id:
+        logger.error("Cannot finalize application: user_id is missing")
+        if message:
+            await message.answer("An error occurred. Please try starting the application again.")
+        await state.clear()
+        return
+
     # Save application
-    application = await create_application(message.from_user.id, data)
+    application = await create_application(user_id, data)
     
     # Show summary
     summary = get_application_summary(data)
-    await message.answer(summary, parse_mode="HTML")
+    if message:
+        await message.answer(summary, parse_mode="HTML")
     
     # Show confirmation
     confirmation = (
@@ -245,10 +324,11 @@ async def set_task_description(message: Message, state: FSMContext, bot: Bot):
         f"Would you like to get an AI consultation?"
     )
     
-    await message.answer(confirmation, reply_markup=get_after_application_keyboard(), parse_mode="HTML")
+    if message:
+        await message.answer(confirmation, reply_markup=get_after_application_keyboard(), parse_mode="HTML")
     
     # Notify admins
-    await notify_new_application(bot, application, message.from_user.username)
+    await notify_new_application(bot, application, username)
     
     await state.clear()
-    logger.info(f"Application #{application.id} completed by user {message.from_user.id}")
+    logger.info(f"Application #{application.id} completed by user {user_id}")

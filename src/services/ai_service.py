@@ -1,6 +1,8 @@
 """AI сервис для консультаций (Google Gemini API)"""
 
 import logging
+import json
+import re
 from typing import List, Dict, Optional
 
 import google.generativeai as genai
@@ -54,7 +56,7 @@ Budget reference (Poland/Europe):
 - Mid-range: €1,500–5,000
 - Complex: €5,000–15,000+
 
-If the client clearly states they want to leave an application — start your response with "APPLICATION_REQUEST" on a separate line, then continue with your message."""
+If the client clearly states they want to leave an application, or if you have enough information to suggest one, start your response with "APPLICATION_REQUEST" on a separate line, then continue with your message. Be sure to ask the user explicitly if they would like to file a formal application."""
 
 
 class AIService:
@@ -159,6 +161,42 @@ class AIService:
         except Exception as e:
             logger.error(f"Error analyzing application: {e}", exc_info=True)
             return "Analysis temporarily unavailable."
+
+    async def extract_application_data(self, conversation_history: List[Dict[str, str]]) -> Dict:
+        """Извлечь данные для заявки из истории диалога"""
+
+        history_text = ""
+        for msg in conversation_history:
+            role = msg["role"]
+            content = msg["content"]
+            history_text += f"{role.capitalize()}: {content}\n"
+
+        prompt = (
+            f"Based on the following conversation history, extract information for a project application. "
+            f"Return the data in JSON format with the following keys:\n"
+            f"- project_type (possible values: bot, crm, website, parsing, other)\n"
+            f"- project_subtype (relevant if project_type is bot: broadcast, lead_form, integration, chatbot, other)\n"
+            f"- budget_range (e.g., 'under €500', '€500–1,500', '€1,500–5,000', '€5,000–15,000', '€15,000+')\n"
+            f"- timeline (e.g., 'This week', 'This month', 'This quarter', 'Just planning')\n"
+            f"- contact_info (any phone, email or username provided)\n"
+            f"- task_description (a concise summary of the project goals and requirements)\n\n"
+            f"If a piece of information is missing, use null for that field.\n\n"
+            f"Conversation history:\n{history_text}\n\n"
+            f"Return ONLY the JSON object."
+        )
+
+        try:
+            response = await self._generate(prompt)
+            # Извлечь JSON из ответа (на случай, если AI добавил лишний текст)
+
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                return data
+            return {}
+        except Exception as e:
+            logger.error(f"Error extracting application data: {e}", exc_info=True)
+            return {}
 
 
 # Глобальный экземпляр

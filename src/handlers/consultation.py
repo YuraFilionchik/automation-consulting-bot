@@ -7,7 +7,12 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from src.keyboards.inline import get_start_keyboard, get_main_menu_inline, get_cancel_keyboard
+from src.keyboards.inline import (
+    get_start_keyboard,
+    get_main_menu_inline,
+    get_cancel_keyboard,
+    get_confirm_application_keyboard
+)
 from src.services.ai_service import ai_service
 from src.utils.formatters import sanitize_html
 
@@ -101,12 +106,39 @@ async def handle_consultation_message(message: Message, state: FSMContext):
         await message.answer(sanitize_html(ai_response), parse_mode="HTML")
 
     if should_switch_to_app:
-        from src.handlers.application import start_application
-        await message.answer("💡 Switching to application form...")
-        await state.clear()
-        await start_application(message, state)
+        await message.answer(
+            "Would you like to file a formal application for this project?",
+            reply_markup=get_confirm_application_keyboard()
+        )
     
     logger.info(f"Consultation message from user {user_id}: {len(user_message)} chars")
+
+
+@router.callback_query(ConsultationState.active, F.data == "confirm_app_start")
+async def process_confirm_app(callback: CallbackQuery, state: FSMContext):
+    """Handle confirmation to start application from AI consultation"""
+
+    user_id = callback.from_user.id
+    history = user_conversations.get(user_id, [])
+
+    await callback.message.edit_text("⏳ Extracting data from our conversation...", reply_markup=None)
+
+    # Extract data using AI
+    extracted_data = await ai_service.extract_application_data(history)
+
+    from src.handlers.application import start_application
+    await callback.message.delete()
+    # Pass both message and the actual user who clicked the button
+    await start_application(callback.message, state, initial_data=extracted_data, user=callback.from_user)
+    await callback.answer()
+
+
+@router.callback_query(ConsultationState.active, F.data == "continue_consultation")
+async def process_continue_consultation(callback: CallbackQuery, state: FSMContext):
+    """Continue consultation after declining application"""
+
+    await callback.message.edit_text("Got it! Let's continue our conversation. What else would you like to know?")
+    await callback.answer()
 
 
 @router.message(F.text == "/consultation_status")

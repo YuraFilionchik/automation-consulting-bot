@@ -19,6 +19,19 @@ def get_start_keyboard():
     return keyboard
 
 
+def get_confirm_application_keyboard():
+    """Confirm application creation from consultation"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Yes, start application", callback_data="confirm_app_start"),
+                InlineKeyboardButton(text="💬 No, continue talk", callback_data="continue_consultation"),
+            ],
+        ]
+    )
+    return keyboard
+
+
 def get_project_type_keyboard():
     """Select project type"""
     keyboard = InlineKeyboardMarkup(
