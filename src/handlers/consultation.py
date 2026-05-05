@@ -59,16 +59,12 @@ async def handle_consultation_message(message: Message, state: FSMContext):
     user_message = message.text.strip()
     
     # Check if user wants to submit an application
-    if any(keyword in user_message.lower() for keyword in ['want application', 'submit application', 'apply now']):
+    apply_keywords = ['want application', 'submit application', 'apply now', 'apply', 'order', 'price', 'cost']
+    if any(keyword in user_message.lower() for keyword in apply_keywords):
         from src.handlers.application import start_application
         await message.answer("💡 Got it! Switching to application form...")
         await state.clear()
-        # Create fake callback to call the function
-        class FakeCallback:
-            def __init__(self, user):
-                self.message = message
-                self.from_user = user
-        await start_application(FakeCallback(message.from_user), state)
+        await start_application(message, state)
         return
     
     # Add user message to history
@@ -78,7 +74,7 @@ async def handle_consultation_message(message: Message, state: FSMContext):
     user_conversations[user_id].append({"role": "user", "content": user_message})
     
     # Show typing indicator
-    await message.answer("⏳ Thinking...")
+    thinking_msg = await message.answer("⏳ Thinking...")
     
     # Get AI response
     ai_response = await ai_service.get_response(
@@ -86,12 +82,29 @@ async def handle_consultation_message(message: Message, state: FSMContext):
         conversation_history=user_conversations[user_id]
     )
     
+    # Check for application request from AI
+    should_switch_to_app = False
+    if "APPLICATION_REQUEST" in ai_response:
+        ai_response = ai_response.replace("APPLICATION_REQUEST", "").strip()
+        should_switch_to_app = True
+
     # Add AI response to history
     user_conversations[user_id].append({"role": "assistant", "content": ai_response})
     
     # Send response
-    await message.delete()  # Remove "Thinking..."
-    await message.answer(sanitize_html(ai_response), parse_mode="HTML")
+    try:
+        await thinking_msg.delete()
+    except Exception:
+        pass
+
+    if ai_response.strip():
+        await message.answer(sanitize_html(ai_response), parse_mode="HTML")
+
+    if should_switch_to_app:
+        from src.handlers.application import start_application
+        await message.answer("💡 Switching to application form...")
+        await state.clear()
+        await start_application(message, state)
     
     logger.info(f"Consultation message from user {user_id}: {len(user_message)} chars")
 
